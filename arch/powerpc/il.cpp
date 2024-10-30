@@ -1700,57 +1700,41 @@ bool GetLowLevelILForPPCInstruction(Architecture *arch, LowLevelILFunction &il,
 		case PPC_INS_LSWI:
 			REQUIRE3OPS
 			{
-				MYLOG("LSWI");
 				int64_t nb = oper2->imm;
 				if (nb == 0)
-					nb = 32;
-				
+					nb = 32;				
 				int64_t nr = nb / 4;
 				if (nb % 4 != 0)
 					nr += 1;
-
 				int64_t dest = 0;
 				for (int i = 0; i < nr; i++) 
 				{				
 					dest = oper0->reg + i;
 					if (dest > PPC_REG_R31)
 						dest = dest - 32;
-					
-					ei0 = il.SetRegister(4,
-					    		dest,							// dest
-				    			il.Load(4, 				// src
-				    			  il.Add(4,
-		    		      		il.Register(4, oper1->reg),
-		    		          il.Const(4, i*4)
-			    		      )
-				    			)
-					      );
+					ei0 = il.Add(4, il.Register(4, oper1->reg), il.Const(4, i*4));
+					ei0 = il.Load(4, ei0);
+					ei0 = il.SetRegister(4, dest, ei0);
 					il.AddInstruction(ei0);
-				}
-
-				if (nb % 4 != 0) 
-				{
-				  int64_t mask = 0;
-					switch (nb % 4) 
+					if (i + 1 == nr && nb % 4 != 0) 
 					{
-						case 1:
-							mask = 0xff000000;
-							break;
-						case 2:
-							mask = 0xffff0000;
-							break;
-						case 3:
-							mask = 0xffffff00;
-							break;
+					  int64_t mask = 0;
+						switch (nb % 4) 
+						{
+							case 1:
+								mask = 0xff000000;
+								break;
+							case 2:
+								mask = 0xffff0000;
+								break;
+							case 3:
+								mask = 0xffffff00;
+								break;
+						}
+						ei0 = il.And(4, il.Register(4, dest), il.Const(4, mask));
+						ei0 = il.SetRegister(4, dest, ei0);
+						il.AddInstruction(ei0);
 					}
-					ei0 = il.SetRegister(4,
-									dest,
-									il.And(4,
-								  	il.Register(4, dest),
-										il.Const(4, mask)  
-							    )
-								);
-					il.AddInstruction(ei0);
 				}
 			}
 			break;
@@ -1758,28 +1742,22 @@ bool GetLowLevelILForPPCInstruction(Architecture *arch, LowLevelILFunction &il,
 		case PPC_INS_STSWI:
 			REQUIRE3OPS
 			{
-				MYLOG("STSWI");
-
 				int64_t nb = oper2->imm;
 				if (nb == 0)
 					nb = 32;
-				
 				int64_t nr = nb / 4;
 				if (nb % 4 != 0)
 					nr += 1;
-
-				// int64_t src = oper0->reg;
 				for (int i = 0; i < nr; i++) 
 				{				
 					int64_t src = oper0->reg + i;
 					if (src > PPC_REG_R31)
 						src = src - 32;
-					
 					if (i+1 == nr && nb % 4 != 0)
 					{
 						// last store and partial
 					  int64_t mask = 0;
-						switch (nb % 4) 
+						switch (nb % 4)
 						{
 							case 1:
 								mask = 0xff000000;
@@ -1795,15 +1773,8 @@ bool GetLowLevelILForPPCInstruction(Architecture *arch, LowLevelILFunction &il,
 					}
 					else
 						ei0 = il.Register(4, src);
-						
-					ei0 = il.Store(4,
-			    			  il.Add(4,
-	    		      		il.Register(4, oper1->reg),
-	    		          il.Const(4, i*4)
-		    		      ),
-			    			  ei0
-			    			);
-					il.AddInstruction(ei0);
+					ei1 = il.Add(4, il.Register(4, oper1->reg), il.Const(4, i*4));
+					il.AddInstruction(il.Store(4, ei1, ei0));
 				}
 			}
 			break;
